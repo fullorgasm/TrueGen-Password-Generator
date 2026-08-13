@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TrueGen</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <h1>TrueGen Password Generator</h1>
+
+  <label for="length">Password length</label>
+  <select id="length">
+    <option value="8">8</option>
+    <option value="10">10</option>
+    <option value="12" selected>12</option>
+    <option value="14">14</option>
+    <option value="16">16</option>
+    <option value="20">20</option>
+    <option value="24">24</option>
+    <option value="32">32</option>
+  </select>
+
+  <label for="complexity">Complexity level</label>
+  <select id="complexity">
+    <option value="1" selected>Type 1 — Standard (Latin, digits, symbols)</option>
+    <option value="2">Type 2 — Global (adds classical alphabets &amp; symbols)</option>
+    <option value="3">Type 3 — Safe-Extended (invisible/combining modifiers, no mixed scripts)</option>
+  </select>
+
+  <p id="type3-note" class="note" hidden>
+    Type 3 uses invisible characters. Most login forms will accept it, but
+    some may reject or mangle it. If a site rejects your new password,
+    switch back to Type 1 or 2 and generate again.
+  </p>
+
+  <label for="min-digits">Minimum required digits</label>
+  <select id="min-digits">
+    <option value="0" selected>0 (no guarantee — default)</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+  </select>
+
+  <label for="min-special">Minimum classic special characters</label>
+  <select id="min-special">
+    <option value="0" selected>0 (no guarantee — default)</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+  </select>
+
+  <p class="note">
+    ⚠️ Setting either minimum above 0 slightly <strong>reduces entropy</strong>
+    (some positions become predictably "at least this many digits / special
+    chars" instead of fully free choice). Leave both at 0 for maximum
+    entropy; raise them only if a specific site requires it. "Classic
+    special characters" means standard ASCII punctuation
+    (<code>! @ # $ % ^ &amp; * ( ) - _ = + [ ] { } | ; : ' " , . &lt; &gt; / ?</code>
+    etc.) — available at every complexity level, including Type 3.
+  </p>
+
+  <button id="fill-btn">Fill focused field</button>
+
+  <p id="status" class="status" role="status"></p>
+
+  <hr />
+
+  <label class="checkbox-row">
+    <input type="checkbox" id="save-ack" />
+    I saved this password in my browser or password manager
+  </label>
+
+  <p class="warning">
+    ⚠️ This extension cannot detect or verify whether Firefox actually saved
+    your password — there is no WebExtension API for that. This checkbox is
+    just a personal reminder. Please confirm the save yourself, e.g. via the
+    "Save Login?" prompt after submitting the form, or under
+    <em>Settings → Privacy &amp; Security → Logins and Passwords</em>.
+  </p>
+
+  <p class="footnote">
+    TrueGen never stores, transmits, or logs the passwords it generates.
+    Each password is created locally and written directly into the field
+    you had focused — it exists only in your browser's memory and, if you
+    save it, in Firefox's own password manager.
+  </p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

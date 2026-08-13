@@ -1,0 +1,29 @@
+{
+  "manifest_version": 2,
+  "name": "TrueGen Password Generator",
+  "version": "1.0.0",
+  "description": "Generates strong passwords locally in your browser and inserts them directly into the focused field. Nothing is ever stored or transmitted by this extension.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "truegen@local.temporary",
+      "strict_min_version": "102.0"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "<all_urls>",
+    "https://qrng.anu.edu.au/*"
+  ],
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "TrueGen Password Generator"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}
