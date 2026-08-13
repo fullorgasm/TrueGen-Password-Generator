@@ -5,11 +5,7 @@ strong passwords entirely inside your browser and inserts them directly
 into whatever field you have focused. It doesn't store, sync, transmit,
 or log anything it generates.
 
-> **Status:** experimental / unsigned. Load it as a temporary add-on (see
-> below) — it isn't published on addons.mozilla.org.
-
 ---
-
 ## Why
 
 Most password generators either live in a paid manager or run on a
@@ -142,8 +138,7 @@ security-sensitive path.
 
 ## License
 
-Add a license of your choice (e.g. MIT) before publishing this
-repository publicly. No license is currently specified.
+MIT
 
 ## Disclaimer
 
