@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unicode Password Viewer</title>
+<style>
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  margin: 32px; line-height: 1.45;
+  background: #111; color: #eee;
+}
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+h1 { margin-bottom: 6px; }
+.subtitle { color: #aaa; margin-top: 0; }
+.lang-select {
+  background: #222; color: #eee; border: 1px solid #555;
+  padding: 6px 12px; border-radius: 6px; font-size: 14px; outline: none;
+  cursor: pointer;
+}
+.note {
+  background: #1e1e1e; border: 1px solid #444; padding: 14px 16px;
+  border-radius: 10px; margin: 18px 0;
+}
+.password-input-wrapper {
+  display: flex; gap: 10px; margin-top: 10px;
+}
+input[type="text"] {
+  flex: 1;
+  font-family: "Noto Sans Symbols 2","Segoe UI Symbol",monospace;
+  font-size: 20px;
+  background: #000; border: 1px solid #555; color: #eee;
+  padding: 12px 16px; border-radius: 10px; outline: none;
+}
+input[type="text"]:focus { border-color: #888; }
+button {
+  background: #6b3f00; color: #ffd89a; border: none;
+  padding: 0 24px; border-radius: 10px; font-size: 16px;
+  font-weight: bold; cursor: pointer; transition: background 0.2s;
+}
+button:hover { background: #854e00; }
+table { border-collapse: collapse; width: 100%; margin-top: 22px; }
+th, td { border: 1px solid #444; padding: 8px; text-align: left; vertical-align: middle; }
+th { background: #222; position: sticky; top: 0; }
+.special { background: #3a2410; }
+.char {
+  font-size: 30px; width: 80px; text-align: center;
+  font-family: "Noto Sans Symbols 2","Segoe UI Symbol",monospace;
+}
+.badge {
+  display:inline-block; padding:2px 7px; border-radius:6px;
+  background:#6b3f00; color:#ffd89a; font-size:12px;
+}
+.small { color:#aaa; font-size: 13px; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+</style>
+</head>
+<body>
+
+<div class="header-row">
+  <h1 id="title">Unicode Password Viewer</h1>
+  <select id="langSelect" class="lang-select">
+    <option value="en" selected>English</option>
+    <option value="ru">Русский</option>
+  </select>
+</div>
+<p class="subtitle" id="subtitle">Character-by-character breakdown and Unicode code points</p>
+
+<div class="note">
+  <b id="inputLabel">Enter password for analysis:</b>
+  <div class="password-input-wrapper">
+    <input type="text" id="passwordInput" value=":̙P̥]͡P̶9︈2͢:̤9ͅ]︎)̵c̥CͯF̅?͇j̤x̏I̮^̻}︇z̝">
+    <button id="decodeBtn">Decoder</button>
+  </div>
+  <p class="small" style="margin-top: 12px; margin-bottom: 0;">
+    <span class="badge" id="badgeText">orange rows</span>
+    <span id="noteDesc">contain combining, formatting, or special characters (U+0300–036F, U+FE00–FE0F, PUA) that visually merge or stay invisible.</span>
+  </p>
+</div>
+
+<table>
+<thead>
+<tr>
+  <th>№</th>
+  <th id="thChar">Visible Char</th>
+  <th id="thCode">Unicode Code</th>
+  <th id="thName">Unicode Name</th>
+  <th id="thCat">Category</th>
+  <th id="thCcc">Combining Class</th>
+  <th id="thDesc">Description</th>
+</tr>
+</thead>
+<tbody id="tableBody">
+</tbody>
+</table>
+
+<script>
+// Тексты UI интерфейса
+const UI_TEXTS = {
+  en: {
+    title: "Unicode Password Viewer",
+    subtitle: "Character-by-character breakdown and Unicode code points",
+    inputLabel: "Enter password for analysis:",
+    btn: "Decoder",
+    badge: "orange rows",
+    noteDesc: "contain combining, formatting, or special characters (U+0300–036F, U+FE00–FE0F, PUA) that visually merge or stay invisible.",
+    thChar: "Visible Char",
+    thCode: "Unicode Code",
+    thName: "Unicode Name",
+    thCat: "Category",
+    thCcc: "Combining Class",
+    thDesc: "Description",
+    descBase: "Base character",
+    descSpecial: "Modifier / invisible or combining",
+    unknownChar: "UNKNOWN CHARACTER"
+  },
+  ru: {
+    title: "Просмотрщик Unicode-пароля",
+    subtitle: "Посимвольный разбор строки и её Unicode-кодов",
+    inputLabel: "Введите пароль для анализа:",
+    btn: "Декодер",
+    badge: "оранжевые строки",
+    noteDesc: "содержат комбинируемые, форматирующие или специальные символы (U+0300–036F, U+FE00–FE0F, PUA), визуально сливающиеся с соседними символами.",
+    thChar: "Видимый символ",
+    thCode: "Unicode-код",
+    thName: "Название Unicode",
+    thCat: "Категория",
+    thCcc: "Класс комбинирования",
+    thDesc: "Описание",
+    descBase: "Основной символ",
+    descSpecial: "Модификатор/невидимый или комбинируемый",
+    unknownChar: "НЕИЗВЕСТНЫЙ СИМВОЛ"
+  }
+};
+
+// Известные имена символов (двуязычные)
+const KNOWN_SYMBOLS = {
+  0x003A: { enName: 'COLON', ruName: 'COLON', catEn: 'Punctuation (Po)', catRu: 'Знак пунктуации (Po)' },
+  0x0050: { enName: 'LATIN CAPITAL LETTER P', ruName: 'LATIN CAPITAL LETTER P', catEn: 'Uppercase Letter (Lu)', catRu: 'Заглавная буква (Lu)' },
+  0x005D: { enName: 'RIGHT SQUARE BRACKET', ruName: 'RIGHT SQUARE BRACKET', catEn: 'Close Punctuation (Pe)', catRu: 'Закрывающая пунктуация (Pe)' },
+  0x0039: { enName: 'DIGIT NINE', ruName: 'DIGIT NINE', catEn: 'Decimal Digit (Nd)', catRu: 'Десятичная цифра (Nd)' },
+  0x0032: { enName: 'DIGIT TWO', ruName: 'DIGIT TWO', catEn: 'Decimal Digit (Nd)', catRu: 'Десятичная цифра (Nd)' },
+  0x0029: { enName: 'RIGHT PARENTHESIS', ruName: 'RIGHT PARENTHESIS', catEn: 'Close Punctuation (Pe)', catRu: 'Закрывающая пунктуация (Pe)' },
+  0x0063: { enName: 'LATIN SMALL LETTER C', ruName: 'LATIN SMALL LETTER C', catEn: 'Lowercase Letter (Ll)', catRu: 'Строчная буква (Ll)' },
+  0x0043: { enName: 'LATIN CAPITAL LETTER C', ruName: 'LATIN CAPITAL LETTER C', catEn: 'Uppercase Letter (Lu)', catRu: 'Заглавная буква (Lu)' },
+  0x0046: { enName: 'LATIN CAPITAL LETTER F', ruName: 'LATIN CAPITAL LETTER F', catEn: 'Uppercase Letter (Lu)', catRu: 'Заглавная буква (Lu)' },
+  0x003F: { enName: 'QUESTION MARK', ruName: 'QUESTION MARK', catEn: 'Punctuation (Po)', catRu: 'Знак пунктуации (Po)' },
+  0x006A: { enName: 'LATIN SMALL LETTER J', ruName: 'LATIN SMALL LETTER J', catEn: 'Lowercase Letter (Ll)', catRu: 'Строчная буква (Ll)' },
+  0x0078: { enName: 'LATIN SMALL LETTER X', ruName: 'LATIN SMALL LETTER X', catEn: 'Lowercase Letter (Ll)', catRu: 'Строчная буква (Ll)' },
+  0x0049: { enName: 'LATIN CAPITAL LETTER I', ruName: 'LATIN CAPITAL LETTER I', catEn: 'Uppercase Letter (Lu)', catRu: 'Заглавная буква (Lu)' },
+  0x005E: { enName: 'CIRCUMFLEX ACCENT', ruName: 'CIRCUMFLEX ACCENT', catEn: 'Modifier Symbol (Sk)', catRu: 'Модификатор символа (Sk)' },
+  0x007D: { enName: 'RIGHT CURLY BRACKET', ruName: 'RIGHT CURLY BRACKET', catEn: 'Close Punctuation (Pe)', catRu: 'Закрывающая пунктуация (Pe)' },
+  0x007A: { enName: 'LATIN SMALL LETTER Z', ruName: 'LATIN SMALL LETTER Z', catEn: 'Lowercase Letter (Ll)', catRu: 'Строчная буква (Ll)' }
+};
+
+function getUnicodeInfo(codePoint, lang) {
+  const isRu = lang === 'ru';
+  const t = UI_TEXTS[lang];
+
+  // 1. Известный символ
+  if (KNOWN_SYMBOLS[codePoint]) {
+    const sym = KNOWN_SYMBOLS[codePoint];
+    return {
+      name: isRu ? sym.ruName : sym.enName,
+      cat: isRu ? sym.catRu : sym.catEn,
+      ccc: 0,
+      isSpecial: false
+    };
+  }
+
+  // 2. Private Use Area (U+E000 - U+F8FF)
+  if (codePoint >= 0xE000 && codePoint <= 0xF8FF) {
+    return {
+      name: t.unknownChar,
+      cat: 'Co (Co)',
+      ccc: 0,
+      isSpecial: false
+    };
+  }
+
+  // 3. Variation Selectors (U+FE00 - U+FE0F)
+  if (codePoint >= 0xFE00 && codePoint <= 0xFE0F) {
+    const num = codePoint - 0xFE00 + 1;
+    return {
+      name: `VARIATION SELECTOR-${num}`,
+      cat: isRu ? 'Несоединяющийся знак (Mn)' : 'Non-spacing Mark (Mn)',
+      ccc: 0,
+      isSpecial: true
+    };
+  }
+
+  // 4. Combining Diacritics (U+0300 - U+036F)
+  if (codePoint >= 0x0300 && codePoint <= 0x036F) {
+    let ccc = 220;
+    if ([0x0305, 0x030F, 0x036F].includes(codePoint)) ccc = 230;
+    if (codePoint === 0x0335 || codePoint === 0x0336) ccc = 1;
+    if (codePoint === 0x0361) ccc = 234;
+    if (codePoint === 0x0362) ccc = 233;
+    if (codePoint === 0x0345) ccc = 240;
+
+    return {
+      name: 'COMBINING MODIFIER',
+      cat: isRu ? 'Несоединяющийся знак (Mn)' : 'Non-spacing Mark (Mn)',
+      ccc: ccc,
+      isSpecial: true
+    };
+  }
+
+  // Резервное правило для остальных символов
+  return {
+    name: 'UNICODE CHARACTER',
+    cat: isRu ? 'Символ' : 'Symbol',
+    ccc: 0,
+    isSpecial: false
+  };
+}
+
+function updateUI() {
+  const lang = document.getElementById('langSelect').value;
+  const t = UI_TEXTS[lang];
+
+  document.documentElement.lang = lang;
+  document.title = t.title;
+  document.getElementById('title').innerText = t.title;
+  document.getElementById('subtitle').innerText = t.subtitle;
+  document.getElementById('inputLabel').innerText = t.inputLabel;
+  document.getElementById('decodeBtn').innerText = t.btn;
+  document.getElementById('badgeText').innerText = t.badge;
+  document.getElementById('noteDesc').innerText = t.noteDesc;
+
+  document.getElementById('thChar').innerText = t.thChar;
+  document.getElementById('thCode').innerText = t.thCode;
+  document.getElementById('thName').innerText = t.thName;
+  document.getElementById('thCat').innerText = t.thCat;
+  document.getElementById('thCcc').innerText = t.thCcc;
+  document.getElementById('thDesc').innerText = t.thDesc;
+
+  decodePassword();
+}
+
+function decodePassword() {
+  const lang = document.getElementById('langSelect').value;
+  const t = UI_TEXTS[lang];
+  const input = document.getElementById('passwordInput').value;
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  const chars = Array.from(input);
+
+  chars.forEach((char, index) => {
+    const codePoint = char.codePointAt(0);
+    const hexCode = 'U+' + codePoint.toString(16).toUpperCase().padStart(4, '0');
+    const info = getUnicodeInfo(codePoint, lang);
+
+    const tr = document.createElement('tr');
+    if (info.isSpecial) {
+      tr.className = 'special';
+    }
+
+    const description = info.isSpecial ? t.descSpecial : t.descBase;
+
+    tr.innerHTML = `
+      <td>${index + 1}</td>
+      <td class="char">${escapeHtml(char)}</td>
+      <td><code>${hexCode}</code></td>
+      <td>${info.name}</td>
+      <td>${info.cat}</td>
+      <td>${info.ccc}</td>
+      <td>${description}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Слушатели событий
+document.getElementById('langSelect').addEventListener('change', updateUI);
+document.getElementById('decodeBtn').addEventListener('click', decodePassword);
+document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') decodePassword();
+});
+
+// Первый запуск
+updateUI();
+</script>
+</body>
+</html>
