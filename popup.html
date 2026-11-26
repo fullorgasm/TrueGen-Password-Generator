@@ -1,30 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>TrueGen</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <h1>TrueGen Password Generator</h1>
+  <h1 data-i18n="popupHeading">TrueGen Password Generator</h1>
+  <div id="security-tier-badge" class="tier-badge tier-minicrypt" role="status">
+    <span id="security-tier-label" aria-live="polite" data-i18n="tierMinicryptLabel">Minicrypt (HKDF-SHA256 ⊕ BLAKE2b-512 + Argon2id)</span>
+  </div>
 
-  <label for="length">Password length</label>
-  <select id="length">
-    <option value="8">8</option>
-    <option value="10">10</option>
-    <option value="12" selected>12</option>
-    <option value="14">14</option>
-    <option value="16">16</option>
-    <option value="20">20</option>
-    <option value="24">24</option>
-    <option value="32">32</option>
+  <label for="preset-select" data-i18n="presetLabel">Quick presets</label>
+  <select id="preset-select">
+    <option value="" selected data-i18n="presetChoose">— choose a preset —</option>
+    <option value="wifi" data-i18n="presetWifi">Wi-Fi router (Type 1, 24 chars, 2 digits + 2 symbols)</option>
+    <option value="banking" data-i18n="presetBanking">Banking/finance (Type 2, 20 chars, 2 digits + 2 symbols)</option>
+    <option value="general" data-i18n="presetGeneral">General login (Type 1, 16 chars)</option>
+    <option value="vault-max" data-i18n="presetVaultMax">Vault / max entropy (Type 5, 64 chars)</option>
   </select>
+  <p class="footnote">
+    Applies a length/complexity/minimum combination in one click — you
+    can still adjust anything afterward. Doesn't restrict what you can
+    otherwise choose; it's just a shortcut.
+  </p>
 
-  <label for="complexity">Complexity level</label>
+  <label for="length-slider" data-i18n="lengthLabel">Password length</label>
+  <div class="length-row">
+    <input type="range" id="length-slider" min="4" max="256" step="1" value="12" list="length-ticks" />
+    <span id="length-value" class="length-value">12</span>
+  </div>
+  <datalist id="length-ticks">
+    <option value="32"></option>
+    <option value="64"></option>
+    <option value="128"></option>
+    <option value="256"></option>
+  </datalist>
+
+  <label for="length-custom" data-i18n="lengthCustomLabel">Or type an exact length</label>
+  <input type="number" id="length-custom" min="4" max="100000" data-i18n-placeholder="lengthCustomPlaceholder" placeholder="e.g. 20, 512, 4096…" />
+  <p id="length-warning" class="note" hidden></p>
+  <p class="footnote">⚠️ This field <strong>overrides the slider</strong> whenever it has a value — clear it to go back to using the slider. Supports any length from <strong>4 up to 100,000</strong> characters (lengths above 1,024 are meant for offline master keys / clipboard and may take a moment).</p>
+
+  <p id="field-hint-row" class="field-hint-row">
+    <span id="field-hint-text" class="field-hint-text" hidden></span>
+    <span id="field-hint-icon" class="info-icon" tabindex="0" role="button" data-i18n-aria-label="fieldHintIconAria" aria-label="More info about this hint" hidden>
+      ⓘ<span id="field-hint-tooltip" class="tooltip-bubble"></span>
+    </span>
+  </p>
+
+  <label for="complexity" data-i18n="complexityLabel">Complexity level</label>
   <select id="complexity">
-    <option value="1" selected>Type 1 — Standard (Latin, digits, symbols)</option>
-    <option value="2">Type 2 — Global (adds classical alphabets &amp; symbols)</option>
-    <option value="3">Type 3 — Safe-Extended (invisible/combining modifiers, no mixed scripts)</option>
+    <option value="1" selected data-i18n="complexityType1">Type 1 — Standard (Latin, digits, symbols)</option>
+    <option value="2" data-i18n="complexityType2">Type 2 — Global (adds classical alphabets &amp; symbols)</option>
+    <option value="3" data-i18n="complexityType3">Type 3 — Safe-Extended (invisible/combining modifiers, no mixed scripts)</option>
+    <option value="4" data-i18n="complexityType4">Type 4 — Practical Maximum (+CJK, Hangul, huge symbol/PUA range)</option>
+    <option value="5" data-i18n="complexityType5">Type 5 — Absolute Maximum (almost the entire Unicode codespace)</option>
+    <option value="6" data-i18n="complexityType6Multi">Type 6 — Hyper-Extended (Multi-Modifier Unicode, ~47.6 bits/char)</option>
+    <option value="7" data-i18n="complexityType7">Type 7 — Custom (you choose the exact alphabet)</option>
   </select>
 
   <p id="type3-note" class="note" hidden>
@@ -33,18 +66,69 @@
     switch back to Type 1 or 2 and generate again.
   </p>
 
-  <label for="min-digits">Minimum required digits</label>
+  <p id="type4-note" class="note" hidden>
+    Type 4 draws from ~94,500 base characters (CJK, Hangul, dozens of
+    scripts, box-drawing/braille/emoji blocks, ...) plus a wide modifier
+    and Private-Use set — ~25.7 bits of entropy per symbol. Almost
+    certainly too exotic for real login forms; treat this as a
+    vault-only / theoretical-maximum tier, not something to type into a
+    typical website.
+  </p>
+
+  <p id="type5-note" class="note" hidden>
+    Type 5 draws from essentially the <strong>entire</strong> valid
+    Unicode codespace (~1.1 million codepoints, ~29.8 bits of entropy per
+    symbol) — everything Type 4 has, plus every other assigned script and
+    symbol, and even currently-unassigned reserved codepoints. It still
+    excludes control characters, the space character, lone surrogates,
+    and official Unicode noncharacters — not as a style choice, but
+    because those genuinely cannot be represented or safely stored as
+    ordinary text. This will almost certainly be rejected by real login
+    forms — it exists as the theoretical ceiling, mainly for a vault or
+    as a cryptographic key/seed, not for typing into a website.
+  </p>
+
+  <p id="type6-multi-note" class="note" hidden>
+    Type 6 stacks <strong>up to 3 independent Unicode modifiers</strong>
+    (variation selectors &amp; combining marks) onto every base codepoint
+    from the full valid Unicode codespace — <strong>~47.6 bits of entropy
+    per symbol</strong> (~12,186 bits at length 256). Designed strictly for
+    offline master keys, disk encryption, and vaults — websites will almost
+    certainly reject it.
+  </p>
+
+  <div id="type6-custom-block" hidden>
+    <label data-i18n="type6CategoriesLabel">Character categories</label>
+    <div id="type6-categories" class="category-grid"></div>
+
+    <label for="type6-input" data-i18n="type6InputLabel">Additional characters or ranges (optional)</label>
+    <textarea id="type6-input" rows="2" data-i18n-placeholder="type6InputPlaceholder" placeholder="Extra literal characters (e.g. AbC!@#日本) or ranges like U+0400-U+04FF, U+1F600-U+1F64F"></textarea>
+    <p class="footnote">
+      Checked categories above and anything typed below are merged into
+      one alphabet — use either, or both together. In the text field,
+      each space/comma-separated token is read independently, so ranges
+      and literal characters can be freely mixed: <code>U+0400-U+04FF</code>
+      is read as a range, while any other token contributes its distinct
+      characters directly. Control characters, lone surrogates, and
+      Unicode noncharacters are always filtered out regardless of what you
+      enter or check. Minimum digit/special guarantees aren't available in
+      Custom mode — you get exactly what you selected/typed, nothing
+      added.
+    </p>
+  </div>
+
+  <label for="min-digits" data-i18n="minDigitsLabel">Minimum required digits</label>
   <select id="min-digits">
-    <option value="0" selected>0 (no guarantee — default)</option>
+    <option value="0" selected data-i18n="minOptionZero">0 (no guarantee — default)</option>
     <option value="1">1</option>
     <option value="2">2</option>
     <option value="3">3</option>
     <option value="4">4</option>
   </select>
 
-  <label for="min-special">Minimum classic special characters</label>
+  <label for="min-special" data-i18n="minSpecialLabel">Minimum classic special characters</label>
   <select id="min-special">
-    <option value="0" selected>0 (no guarantee — default)</option>
+    <option value="0" selected data-i18n="minOptionZero">0 (no guarantee — default)</option>
     <option value="1">1</option>
     <option value="2">2</option>
     <option value="3">3</option>
@@ -58,10 +142,214 @@
     entropy; raise them only if a specific site requires it. "Classic
     special characters" means standard ASCII punctuation
     (<code>! @ # $ % ^ &amp; * ( ) - _ = + [ ] { } | ; : ' " , . &lt; &gt; / ?</code>
-    etc.) — available at every complexity level, including Type 3.
+    etc.) — available at every complexity level except custom Type 6.
   </p>
 
-  <button id="fill-btn">Fill focused field</button>
+  <label class="checkbox-row">
+    <input type="checkbox" id="network-entropy" checked />
+    <span data-i18n="networkEntropyLabel">Query quantum RNG (sends a network request, mixed with local entropy)</span>
+  </label>
+  <p class="footnote">
+    When checked, each generation sends a request to two public randomness
+    services — the <a href="https://qrng.anu.edu.au/" target="_blank" rel="noopener">ANU Quantum RNG</a>
+    and the <a href="https://drand.love/" target="_blank" rel="noopener">drand</a>
+    public randomness beacon — over HTTPS. This does leave your browser: the
+    request reveals your IP address and the timing of that request to those
+    two operators (nothing else — no password data, no other content, is
+    ever sent). Their response is never used on its own: it's combined with
+    fresh local CSPRNG bytes through one HMAC-SHA256 extract-and-expand step
+    (a standard HKDF-style construction), so the final result is at least as
+    strong as local-only generation even if you don't trust either service —
+    querying them can only add uncertainty, never remove it. Uncheck this to
+    generate from local entropy only, with no network request at all (this
+    is verified by an automated test — see <code>tests/network-entropy.test.js</code>
+    if you want to check for yourself).
+  </p>
+
+  <label class="checkbox-row">
+    <input type="checkbox" id="avoid-patterns" checked />
+    <span data-i18n="avoidPatternsLabel">Avoid obvious runs (3+ repeats or sequences like "abc"/"111")</span>
+  </label>
+  <p class="footnote">
+    On by default. This only changes the final <em>ordering</em> of the
+    characters already chosen (a re-shuffle, using fresh local entropy, no
+    network) — it never removes or replaces a character, so it doesn't
+    reduce which characters end up in the password, only avoids an
+    obviously-patterned arrangement of them. With a very small alphabet
+    (e.g. a 2-character custom Type 6 set) this may not always be
+    possible; the status message will say so if it happens.
+  </p>
+
+  <label class="checkbox-row">
+    <input type="checkbox" id="deep-mix" />
+    <span data-i18n="deepMixLabel">Deep-mix: multi-seed reshake per character</span>
+  </label>
+  <p class="footnote">
+    Every password already mixes local CSPRNG entropy through one
+    HMAC-SHA256 extraction (plus the ANU QRNG and drand beacon too, if the
+    checkbox above is on). With Deep-mix on, generation re-draws fresh
+    <em>local</em> entropy and folds it in again before producing each
+    character (when network entropy is also on, network reshakes are
+    additionally capped at 8 rounds to respect QRNG rate limits, then it
+    continues reshaking with local entropy only). This is a genuine
+    defense-in-depth measure — it protects against one seed source turning
+    out to be predictable — rather than a fundamental increase in entropy: a
+    single well-seeded HMAC expansion is already cryptographically
+    indistinguishable from independent randomness per block. Off by
+    default; adds a little latency for long Type 3 passwords.
+  </p>
+
+  <div class="offline-entropy-box">
+    <label for="offline-entropy-btn" data-i18n="offlineEntropyLabel">Offline entropy file (optional, e.g. USB-QRNG / dice)</label>
+    <div class="offline-entropy-row">
+      <button type="button" id="offline-entropy-btn" data-i18n="offlineEntropyBtn">📁 Load entropy file</button>
+      <button type="button" id="offline-entropy-clear" data-i18n="offlineEntropyClearBtn" hidden>✕ Clear</button>
+      <input type="file" id="offline-entropy-file" hidden />
+    </div>
+    <p id="offline-entropy-status" aria-live="polite" class="footnote" style="margin-top:4px; border-top:none; padding-top:0;" hidden></p>
+  </div>
+
+  <label class="checkbox-row">
+    <input type="checkbox" id="clipboard-mode" />
+    <span data-i18n="clipboardModeLabel">Generate to clipboard (skip inserting into a page field)</span>
+  </label>
+  <p class="footnote">
+    Copies the generated password straight to your clipboard instead of
+    requiring a focused field on the page. Note that most clipboard
+    managers/history tools will retain whatever you copy — this doesn't
+    change that, it's a property of the clipboard itself, not something
+    TrueGen can control.
+  </p>
+
+  <label class="checkbox-row">
+    <input type="checkbox" id="audit-mode" />
+    <span data-i18n="auditModeLabel">Audit mode: check the existing password in the field instead of generating</span>
+  </label>
+  <p class="footnote">
+    Reads the field's current value and estimates its composition and a
+    rough entropy figure — nothing is sent anywhere, this is a local,
+    heuristic guess (see the result text for caveats), not a certified
+    security score. Doesn't touch the field's contents.
+  </p>
+
+  <details id="split-section">
+    <summary data-i18n="splitSummary">🔐 Split &amp; store separately</summary>
+    <p class="footnote" style="margin-top:6px;">
+      Splits the generated password into pieces (Shamir secret sharing)
+      across the locations you check below, instead of storing it whole
+      anywhere. Any one piece alone is mathematically indistinguishable
+      from random noise — see the README for exactly which threat this
+      does and doesn't protect against, and why "Cloud" and "Manual" are
+      NOT interchangeable despite both being "not on this device".
+    </p>
+    <label class="checkbox-row">
+      <input type="checkbox" id="split-enabled" />
+      <span data-i18n="splitEnabledLabel">Split this password instead of just filling it in</span>
+    </label>
+
+    <div class="split-backup-row" style="display:flex; gap:6px; margin-top:10px;">
+      <button type="button" id="split-export-btn" data-i18n="splitExportBtn">⬇ Export saved splits</button>
+      <button type="button" id="split-import-btn" data-i18n="splitImportBtn">⬆ Import splits</button>
+      <input type="file" id="split-import-file" accept="application/json,.json" hidden />
+    </div>
+    <p class="footnote">
+      Backs up your <strong>local</strong> split pieces (and their public
+      metadata — labels, sites, thresholds) so they survive a browser
+      reinstall or profile switch. Contains no raw share bytes — the
+      local piece stays encrypted by its PIN inside the export file, so
+      the file alone is safe, but treat it with the same care as any
+      backup: still specific to your splits, still worth not handing to
+      someone you wouldn't trust with the metadata (which sites you use
+      this feature for). Does <strong>not</strong> include Cloud shares
+      (already backed up via Firefox Sync) or Manual codes (never
+      stored anywhere to begin with — that's the point).
+    </p>
+
+    <div id="split-options" hidden>
+      <label for="split-label" data-i18n="splitLabelLabel">Label for this split (defaults to the site)</label>
+      <input type="text" id="split-label" data-i18n-placeholder="splitLabelPlaceholder" placeholder="e.g. example.com login" />
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="split-pure-it" />
+        <span data-i18n="splitPureItLabel">Pure IT-Shamir (0 bits leaked even if P = NP — manual shares only)</span>
+      </label>
+      <p class="footnote" style="margin-top:4px; border-top:none; padding-top:0;" data-i18n="splitPureItNote">
+        Replaces the external HMAC-SHA256 tag with an internal integrity trailer inside the polynomial. Disables Local/Cloud storage so &lt; k shares leak strictly 0 bits.
+      </p>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="split-role-local" checked />
+        <span data-i18n="splitRoleLocal">Local (this browser, protected by a PIN/passphrase)</span>
+      </label>
+
+      <label data-i18n="splitRoleManual">Manual holders (each person gets their own one-time code)</label>
+      <div id="split-manual-holder-list"></div>
+      <button type="button" id="split-manual-holder-add" data-i18n="splitManualHolderAdd">+ Add a person</button>
+      <p class="footnote">
+        Each name here gets its OWN unique code — not a shared code. With
+        a threshold below "all", any that many of these people together
+        can reconstruct the password, but no smaller group (and no
+        single one of them) can. Leave all blank to skip Manual
+        entirely.
+      </p>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="split-role-cloud" />
+        <span data-i18n="splitRoleCloud">Cloud (synced via your Firefox Account)</span>
+      </label>
+      <p class="footnote">
+        Check at least 2 locations total (Local counts as one; each
+        named Manual holder counts as one; Cloud counts as one).
+        <strong>Local</strong> protects against someone stealing this
+        device (useless to them without your PIN).
+        <strong>Manual</strong> is the only one that protects against
+        being forced to unlock everything on this device — it only works
+        if each holder actually keeps their code somewhere separate from
+        this device (and, for multiple holders, separate from each
+        other). <strong>Cloud</strong> only protects against losing this
+        one device (it reappears automatically once you're signed into
+        Firefox Sync anywhere) — it is <em>not</em> a coercion-resistant
+        location, since signing in recovers it.
+      </p>
+
+      <div id="split-threshold-row" hidden>
+        <label for="split-threshold" data-i18n="splitThresholdLabel">Require</label>
+        <select id="split-threshold"></select>
+      </div>
+
+      <div id="split-passphrase-row" hidden>
+        <label for="split-passphrase" data-i18n="splitPassphraseLabel">PIN/passphrase for the local piece</label>
+        <input type="password" id="split-passphrase" autocomplete="off" />
+        <label for="split-passphrase-confirm" data-i18n="splitPassphraseConfirmLabel">Confirm PIN/passphrase</label>
+        <input type="password" id="split-passphrase-confirm" autocomplete="off" />
+        <p class="footnote">
+          Never stored anywhere, including by TrueGen — if you forget it,
+          the local piece is permanently unrecoverable (that's the point:
+          nothing here can "reset" it for you, that would defeat its
+          purpose). A short PIN is faster to type but weaker against
+          someone who steals the encrypted piece and attacks it offline
+          at their leisure — a longer passphrase is meaningfully stronger
+          for the same reason your generated passwords are long.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <button id="fill-btn" data-i18n="fillBtnDefault">Fill focused field</button>
+
+  <div id="split-manual-share-box" hidden>
+    <p class="warning" data-i18n="splitManualShareWarning">
+      ⚠️ These codes are shown ONE TIME ONLY. Save each one somewhere
+      separate from this device (and from each other, if there's more
+      than one) right now — they will not be shown again.
+    </p>
+    <div id="split-manual-share-list"></div>
+    <label class="checkbox-row">
+      <input type="checkbox" id="split-manual-share-confirm" />
+      <span data-i18n="splitManualShareConfirmLabel">I saved every code above, each somewhere separate from this device</span>
+    </label>
+    <button type="button" id="split-manual-share-continue" disabled data-i18n="splitManualShareContinueBtn">Continue &amp; fill the field</button>
+  </div>
 
   <p id="status" class="status" role="status"></p>
 
@@ -69,7 +357,7 @@
 
   <label class="checkbox-row">
     <input type="checkbox" id="save-ack" />
-    I saved this password in my browser or password manager
+    <span data-i18n="saveAckLabel">I saved this password in my browser or password manager</span>
   </label>
 
   <p class="warning">
@@ -84,9 +372,96 @@
     TrueGen never stores, transmits, or logs the passwords it generates.
     Each password is created locally and written directly into the field
     you had focused — it exists only in your browser's memory and, if you
-    save it, in Firefox's own password manager.
+    save it, in Firefox's own password manager. Tip: you can also
+    right-click any editable field and choose <strong>"Fill password
+    (TrueGen)"</strong> from the context menu for a quick length/complexity
+    picker right on the page.
   </p>
 
+  <hr />
+
+  <details id="otp-section">
+    <summary data-i18n="otpSummary">🛡️ One-Time Pad (OTP + Carter–Wegman MAC)</summary>
+    <p class="warning" style="margin-top:6px;" data-i18n="otpWarning">
+      ⚠️ Information-theoretic encryption (C = M ⊕ K) + unconditional GF(2^128) Carter–Wegman MAC. NEVER reuse a pad — send ciphertext and pad via separate channels and destroy the pad after use.
+    </p>
+
+    <label for="otp-plaintext" data-i18n="otpPlaintextLabel">Message / password to encrypt</label>
+    <textarea id="otp-plaintext" rows="2" autocomplete="off" data-i18n-placeholder="otpPlaintextPlaceholder" placeholder="Paste password or short secret…"></textarea>
+    <div class="otp-actions">
+      <button type="button" id="otp-encrypt-btn" data-i18n="otpEncryptBtn">Encrypt (OTP + MAC)</button>
+      <button type="button" id="otp-clear-btn" data-i18n="otpClearBtn">Clear</button>
+    </div>
+
+    <div id="otp-encrypt-result" hidden>
+      <label for="otp-ct-out" data-i18n="otpCtOutLabel">Ciphertext + MAC (TGOTP1)</label>
+      <div class="otp-out-row">
+        <textarea id="otp-ct-out" rows="2" readonly></textarea>
+        <button type="button" id="otp-copy-ct" class="donate-copy-btn" data-i18n="copyBtn">Copy</button>
+      </div>
+      <label for="otp-pad-out" data-i18n="otpPadOutLabel">One-Time Pad (TGPAD1 — keep separate!)</label>
+      <div class="otp-out-row">
+        <textarea id="otp-pad-out" rows="2" readonly></textarea>
+        <button type="button" id="otp-copy-pad" class="donate-copy-btn" data-i18n="copyBtn">Copy</button>
+      </div>
+    </div>
+
+    <hr />
+
+    <label for="otp-ct-in" data-i18n="otpCtInLabel">Decrypt: Ciphertext (TGOTP1)</label>
+    <textarea id="otp-ct-in" rows="2" autocomplete="off" placeholder="TGOTP1:..."></textarea>
+    <label for="otp-pad-in" data-i18n="otpPadInLabel">Decrypt: One-Time Pad (TGPAD1)</label>
+    <textarea id="otp-pad-in" rows="2" autocomplete="off" placeholder="TGPAD1:..."></textarea>
+    <div class="otp-actions">
+      <button type="button" id="otp-decrypt-btn" data-i18n="otpDecryptBtn">Verify MAC &amp; Decrypt</button>
+    </div>
+    <div id="otp-decrypt-result" hidden>
+      <label for="otp-pt-out" data-i18n="otpPtOutLabel">Verified plaintext</label>
+      <div class="otp-out-row">
+        <textarea id="otp-pt-out" rows="2" readonly></textarea>
+        <button type="button" id="otp-copy-pt" class="donate-copy-btn" data-i18n="copyBtn">Copy</button>
+      </div>
+    </div>
+    <p id="otp-status" class="status" role="status"></p>
+  </details>
+
+  <details id="donate-section">
+    <summary data-i18n="donateSummary">💙 Support this project</summary>
+    <p class="footnote" style="margin-top: 6px;">
+      TrueGen is free and stays free — there's no paid tier and nothing
+      here is required to use the extension. If you'd like to support
+      development anyway, here are donation addresses; tap Copy to copy
+      one to your clipboard.
+    </p>
+    <p class="footnote" data-i18n="donateTokensNote">Both native coins and tokens on these blockchains are welcome.</p>
+    <div id="donate-list" class="donate-list"></div>
+  </details>
+
+  <details id="appearance-section">
+    <summary data-i18n="appearanceSummary">🎨 Appearance</summary>
+    <p class="footnote" style="margin-top: 6px;">
+      Purely cosmetic — changes the toolbar button's tooltip text and
+      icon. This does <strong>not</strong> rename the extension in
+      <code>about:addons</code> or hide it from Firefox's extension list
+      in any way; there's no API for that, and TrueGen doesn't attempt
+      workarounds around it.
+    </p>
+    <label for="appearance-title" data-i18n="appearanceTitleLabel">Toolbar tooltip text</label>
+    <input type="text" id="appearance-title" maxlength="60" data-i18n-placeholder="appearanceTitlePlaceholder" placeholder="TrueGen Password Generator" />
+
+    <label for="appearance-icon-file" data-i18n="appearanceIconLabel">Toolbar icon</label>
+    <input type="file" id="appearance-icon-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" />
+    <div id="appearance-icon-preview-row" style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+      <img id="appearance-icon-preview" width="32" height="32" style="border-radius:4px; border:1px solid #ccc;" />
+      <button type="button" id="appearance-reset-btn" data-i18n="appearanceResetBtn">Reset to default</button>
+    </div>
+  </details>
+
+  <script src="lib/argon2id.js"></script>
+  <script src="lib/core.js"></script>
+  <script src="lib/secret-sharing.js"></script>
+  <script src="lib/split-vault.js"></script>
+  <script src="lib/otp-cw.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
